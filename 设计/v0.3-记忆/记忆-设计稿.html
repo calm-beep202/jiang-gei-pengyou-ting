@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚠️ 已过时（以 index.html 为准）· V0.3 设计稿（方案甲）</title>
+<!--
+  这是 V0.3「设计阶段」的稿子，不是现行界面。
+  V0.3 之后界面又演进过：流式输出、打字机效果、语音播报、音色面板……
+  现行界面 → app/static/index.html
+  设计决策 → docs/prd/V0.3-记忆.md、docs/prd/V0.4-活人感.md
+-->
+
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    --coral:#FF6B4A; --coral-soft:#FFE9E3; --ink:#2B2724; --ink-2:#8A8078;
+    --bg:#FFF9F5; --line:#F0E6DF;
+  }
+  html,body{ height:100%; }
+  body{
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:#EDE6E0; color:var(--ink);
+    display:flex; justify-content:center;
+  }
+  /* 桌面预览时居中成手机宽；手机上自然满屏 */
+  #app{
+    width:100%; max-width:520px; height:100dvh;
+    background:var(--bg); display:flex; flex-direction:column; overflow:hidden;
+  }
+
+  /* ============ 小问常驻条 ============ */
+  .topbar{ padding:14px 16px 10px; flex-shrink:0; }
+  .pal{
+    display:flex; align-items:center; gap:11px; cursor:pointer;
+    background:#fff; border:1px solid var(--line); border-radius:20px;
+    padding:11px 15px; box-shadow:0 2px 12px rgba(255,107,74,.05);
+  }
+  .pal .av{
+    width:38px; height:38px; border-radius:50%; background:var(--coral-soft);
+    display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
+  }
+  .pal .who{ flex:1; min-width:0; }
+  .pal b{ font-size:14.5px; display:block; }
+  .pal small{ font-size:12.5px; color:var(--ink-2); }
+  .pal .chev{ color:var(--ink-2); font-size:13px; }
+
+  /* ============ 材料条（可折展） ============ */
+  .meter{ flex-shrink:0; background:#fff; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .mhead{ display:flex; align-items:center; gap:9px; padding:12px 16px; }
+  .mtitle{
+    flex:1; min-width:0; font-size:14.5px; font-weight:600;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mhead button{
+    font-size:12px; border:none; border-radius:14px; padding:6px 10px;
+    font-family:inherit; cursor:pointer; flex-shrink:0; white-space:nowrap;
+  }
+  .mswap{ color:var(--coral); background:var(--coral-soft); }
+  .mtoggle{ color:var(--ink-2); background:var(--bg); }
+  .mbody{ max-height:0; overflow:hidden; transition:max-height .3s ease; }
+  .meter.open .mbody{ max-height:38dvh; overflow-y:auto; }
+  .mbody .pin{ padding:0 16px 16px; font-size:14.5px; line-height:1.8; color:#4A443F; white-space:pre-wrap; }
+
+  /* ============ 对话流（唯一） ============ */
+  #chat{ flex:1; overflow-y:auto; padding:18px 16px 8px; }
+  .msg{ display:flex; margin-bottom:15px; }
+  .msg .b{
+    max-width:80%; padding:11px 15px; font-size:15.5px; line-height:1.65;
+    white-space:pre-wrap; word-break:break-word; border-radius:18px;
+  }
+  .msg.bot .b{ background:#fff; border-bottom-left-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .msg.me{ justify-content:flex-end; }
+  .msg.me .b{ background:var(--coral); color:#fff; border-bottom-right-radius:6px; }
+
+  /* ============ 输入 ============ */
+  footer{ padding:10px 14px 14px; border-top:1px solid var(--line); background:var(--bg); flex-shrink:0; }
+  .inputrow{ display:flex; gap:8px; align-items:center; }
+  .inputrow input{
+    flex:1; padding:12px 16px; border:1px solid var(--line); border-radius:22px;
+    font-size:15.5px; outline:none; background:#fff; font-family:inherit; transition:border-color .15s;
+  }
+  .inputrow input:focus{ border-color:var(--coral); }
+  .inputrow button{
+    width:46px; height:46px; border:none; border-radius:50%; font-size:19px; flex-shrink:0;
+    background:var(--coral); color:#fff; cursor:pointer; transition:transform .12s;
+  }
+  .inputrow button:active{ transform:scale(.93); }
+
+  /* ============ 面板：她记住的 / 换个材料 ============ */
+  .sheet{ position:fixed; inset:0; background:rgba(43,39,36,.34); z-index:30; display:none; align-items:flex-end; justify-content:center; }
+  .sheet.open{ display:flex; }
+  .sheet .panel{
+    width:100%; max-width:520px; max-height:80dvh; background:var(--bg);
+    border-radius:24px 24px 0 0; display:flex; flex-direction:column;
+    animation:slideUp .26s cubic-bezier(.32,.72,0,1);
+  }
+  @keyframes slideUp{ from{ transform:translateY(100%); } }
+  .sheet .ptop{
+    display:flex; align-items:center; padding:18px 20px 12px; flex-shrink:0;
+  }
+  .sheet .ptop b{ flex:1; font-size:16px; }
+  .sheet .ptop button{
+    border:none; background:var(--line); color:var(--ink-2); width:28px; height:28px;
+    border-radius:50%; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  .sheet .plist{ overflow-y:auto; padding:0 16px 24px; }
+  .sect{ font-size:12.5px; color:var(--ink-2); margin:14px 4px 9px; letter-spacing:.3px; }
+  .item{
+    background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:9px;
+    box-shadow:0 2px 10px rgba(255,107,74,.05); cursor:pointer;
+  }
+  .item:active{ background:var(--coral-soft); }
+  .item .it-t{ font-size:15px; font-weight:600; }
+  .item .it-s{ font-size:13px; color:var(--ink-2); line-height:1.6; margin-top:5px; }
+  .item.cur{ outline:2px solid var(--coral); outline-offset:-2px; }
+  .item .it-cur{ font-size:11.5px; color:var(--coral); margin-left:8px; font-weight:500; }
+  .item .it-av{ font-size:12px; }
+</style>
+</head>
+<body>
+<div style="position:fixed;top:0;left:0;right:0;z-index:99;background:#C2410C;color:#fff;
+            font:12px/1.6 -apple-system,'PingFang SC',sans-serif;padding:6px 12px;text-align:center">
+  ⚠️ V0.3 设计阶段的稿子，**已过时**（流式/打字机/语音都是后加的）—— 现行界面以 <code>app/static/index.html</code> 为准
+</div>
+<div id="app">
+
+  <!-- 小问常驻条 -->
+  <div class="topbar">
+    <div class="pal" id="palBtn">
+      <div class="av">🙋</div>
+      <div class="who">
+        <b>小问</b>
+        <small id="palLine">我还不懂这些，你挑一个讲给我听</small>
+      </div>
+      <span class="chev">▸</span>
+    </div>
+  </div>
+
+  <!-- 材料条 -->
+  <div class="meter open" id="meter">
+    <div class="mhead">
+      <div class="mtitle" id="mTitle">什么是 RAG？</div>
+      <button class="mswap" id="mSwap">换个材料</button>
+      <button class="mtoggle" id="mToggle">收起</button>
+    </div>
+    <div class="mbody"><div class="pin" id="mBody"></div></div>
+  </div>
+
+  <!-- 唯一对话流 -->
+  <div id="chat"></div>
+
+  <!-- 输入 -->
+  <footer>
+    <div class="inputrow">
+      <input id="input" placeholder="讲讲你的理解…（可以用输入法的语音说）" autocomplete="off">
+      <button id="send">↑</button>
+    </div>
+  </footer>
+</div>
+
+<!-- 面板 -->
+<div class="sheet" id="sheet">
+  <div class="panel">
+    <div class="ptop"><b id="sheetTitle">小问的学习本</b><button id="sheetClose">✕</button></div>
+    <div class="plist" id="plist"></div>
+  </div>
+</div>
+
+<script>
+/* ================= Mock 数据（真数据来自后端） ================= */
+const TOPICS = [
+  { id:'agent', type:'AI 名词', title:'什么是 Agent？',
+    content:'Agent（智能体）是这两年最火的一个词。Claude Code、Codex、Manus 这些产品都被叫做 Agent。\n\n普通 AI 是你问一句它答一句；Agent 是你给它一个目标，它自己会拆解步骤、调用工具、一步步把活干完，中途还能根据结果调整。\n\n比如你说「帮我查一下这周泰安的天气，如果下雨就订个室内的场地」——Agent 会自己决定先查天气、再判断、再去订场地。',
+    seed:'给它一个目标，它自己拆步骤去干',
+    memory:{ summary:'给它一个目标，它自己拆步骤去干' } },
+  { id:'rag', type:'AI 名词', title:'什么是 RAG？',
+    content:'RAG（检索增强生成）是大模型落地里最常用的一招。\n\n大模型有个毛病：它不知道你公司内部的规定、你自己的资料。你直接问它，它要么答不上来，要么瞎编。\n\nRAG 的做法是：先在你自己的资料库里检索出相关内容，再把「资料 + 你的问题」一起交给模型，让它根据资料回答。\n\n打个比方：不是让模型凭记忆答题，而是让它开卷考试——先翻到相关的那一页，再照着答。',
+    seed:'先翻资料再照着答，像开卷考试',
+    memory:null },
+  { id:'hallucination', type:'AI 名词', title:'大模型的「幻觉」是什么？',
+    content:'幻觉（Hallucination）指大模型一本正经地编造不存在的东西——编得有鼻子有眼，语气还很自信。\n\n比如你让它推荐一本某个领域的书，它会给你一个像模像样的书名、作者，甚至还有出版年份。但你去搜，发现这本书根本不存在。\n\n为什么会这样？因为模型的本质是「预测下一个词」，它追求的是「说出来像真的」，而不是「说的是真的」。',
+    seed:'它一本正经地编，自己还不知道是假的',
+    memory:null },
+  { id:'token', type:'AI 名词', title:'什么是 Token？',
+    content:'Token 是模型处理文字的最小单位。它不完全是「一个字」，也不完全是「一个词」——中文里常常一个词就是一到两个 Token，英文里一个长单词可能被切成好几块。\n\n为什么要知道它？因为模型是按 Token 计费和限长的。同样一段话，用词不同，Token 数可能差不少。',
+    seed:'模型读字的最小单位，也是它算钱、算长度的尺子',
+    memory:null },
+  { id:'finetune', type:'AI 名词', title:'什么是「微调」？',
+    content:'微调（Fine-tuning）是拿一个已经训练好的大模型，用你自己的数据再「补一小课」，让它更贴合你的场景。\n\n它跟 RAG 常被拿来比：RAG 是考试时给它翻书，微调是让它提前把知识学进脑子里。前者改的是「手边有什么」，后者改的是「它本身会什么」。',
+    seed:'拿现成的模型，用你自己的数据再补一小课',
+    memory:{ summary:'拿现成的模型，用你自己的数据再补一小课' } }
+];
+
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+let cur = TOPICS.find(t => !t.memory);   // 当前材料 = 第一张还没讲过的
+let turns = 0;                            // 当前材料上，用户说了几轮
+
+/* ================= 渲染 ================= */
+function renderMeter(){
+  $('#mTitle').textContent = cur.title;
+  $('#mBody').textContent = cur.content;
+}
+function renderPal(){
+  const n = TOPICS.filter(t => t.memory).length;
+  $('#palLine').textContent = n === 0
+    ? '我还不懂这些，你挑一个讲给我听'
+    : `我记住 ${n} 个了，你挑一个接着讲`;
+}
+function addMsg(who, text){
+  const d = document.createElement('div');
+  d.className = 'msg ' + (who === 'me' ? 'me' : 'bot');
+  d.innerHTML = `<div class="b">${esc(text)}</div>`;
+  $('#chat').appendChild(d);
+  $('#chat').scrollTop = $('#chat').scrollHeight;
+}
+
+/* ================= 切换材料 ================= */
+function pick(t){
+  cur = t;
+  turns = 0;
+  renderMeter();
+  // 换材料只是换材料 —— 她不该在这时候开口（尤其不该把总结念一遍）
+  // 新材料默认展开正文让你读；讲过的收起，把屏幕让给对话
+  $('#meter').classList.toggle('open', !t.memory);
+  $('#mToggle').textContent = $('#meter').classList.contains('open') ? '收起' : '展开';
+}
+
+/* ================= 面板 ================= */
+function openSheet(){
+  const list = $('#plist');
+  const undone = TOPICS.filter(t => !t.memory);
+  const done   = TOPICS.filter(t => t.memory);
+  list.innerHTML = '';
+
+  if (undone.length){
+    list.insertAdjacentHTML('beforeend', `<div class="sect">还没讲的（${undone.length}）</div>`);
+    undone.forEach(t => {
+      const el = document.createElement('div');
+      el.className = 'item' + (t.id === cur.id ? ' cur' : '');
+      el.innerHTML = `<div class="it-t">${esc(t.title)}${t.id === cur.id ? '<span class="it-cur">当前</span>' : ''}</div>`;
+      el.onclick = () => { closeSheet(); pick(t); };
+      list.appendChild(el);
+    });
+  }
+  if (done.length){
+    list.insertAdjacentHTML('beforeend', `<div class="sect">小问记住了（${done.length}）</div>`);
+    done.forEach(t => {
+      const el = document.createElement('div');
+      el.className = 'item' + (t.id === cur.id ? ' cur' : '');
+      el.innerHTML = `<div class="it-t">${esc(t.title)}${t.id === cur.id ? '<span class="it-cur">当前</span>' : ''}</div>
+                      <div class="it-s"><span class="it-av">🙋</span> ${esc(t.memory.summary)}</div>`;
+      el.onclick = () => { closeSheet(); pick(t); };
+      list.appendChild(el);
+    });
+  }
+  $('#sheet').classList.add('open');
+}
+function closeSheet(){ $('#sheet').classList.remove('open'); }
+
+/* ================= 事件 ================= */
+$('#palBtn').onclick = openSheet;
+$('#mSwap').onclick = openSheet;
+$('#sheetClose').onclick = closeSheet;
+$('#sheet').onclick = e => { if (e.target.id === 'sheet') closeSheet(); };
+
+$('#mToggle').onclick = () => {
+  const m = $('#meter');
+  m.classList.toggle('open');
+  $('#mToggle').textContent = m.classList.contains('open') ? '收起' : '展开';
+};
+
+/* 发送
+   注意：这是**假回复**。真实现里"她懂没懂"由后端判断。
+   这里只是让设计稿能演一遍闭环：讲够 3 轮 → 她"懂了" → 这张材料进"小问记住了"。 */
+function send(){
+  const v = $('#input').value.trim();
+  if (!v) return;
+  $('#input').value = '';
+  addMsg('me', v);
+  // 一开始讲，材料条自动收起，把屏幕让给对话（想再看得点「展开」）
+  if ($('#meter').classList.contains('open')) {
+    $('#meter').classList.remove('open');
+    $('#mToggle').textContent = '展开';
+  }
+  turns++;
+  setTimeout(() => {
+    if (!cur.memory && turns >= 3) {
+      // 她"懂了"：复述确认 + 记进记忆
+      cur.memory = { summary: cur.seed };
+      renderPal();
+      addMsg('bot', `哦哦我懂了——就是${cur.seed}。`);
+    } else {
+      addMsg('bot', '嗯，我大概跟上了。你再往下说说？');
+    }
+  }, 550);
+}
+$('#send').onclick = send;
+$('#input').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+/* ================= 开场 ================= */
+renderPal();
+renderMeter();
+addMsg('bot', '诶，你刚看的那篇讲啥的？说来听听，我不太懂这个。');
+</script>
+</body>
+</html>

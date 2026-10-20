@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>讲给朋友听</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    --coral:#FF6B4A; --coral-soft:#FFE9E3; --ink:#2B2724; --ink-2:#8A8078;
+    --bg:#FFF9F5; --line:#F0E6DF; --warn:#C2410C; --warn-soft:#FFF1EA;
+  }
+  html,body{ height:100%; }
+  body{
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink);
+  }
+  #app{ width:100%; max-width:520px; margin:0 auto; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+  [hidden]{ display:none !important; }
+
+  /* ============ 骨架屏（加载态） ============ */
+  #boot{ flex:1; padding:26px 18px; }
+  .sk{ background:#EFE8E3; border-radius:9px; height:13px; margin-bottom:11px; animation:pulse 1.4s ease-in-out infinite; }
+  .sk.h34{ height:34px; border-radius:14px; } .sk.h22{ height:22px; }
+  .sk.w60{ width:60%; } .sk.w85{ width:85%; } .sk.w40{ width:40%; }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.5} }
+  #boot .hint{ text-align:center; font-size:12.5px; color:var(--ink-2); margin-top:30px; }
+
+  /* ============ 整屏空态 / 错误态 ============ */
+  .full{
+    flex:1; display:flex; align-items:center; justify-content:center; text-align:center; padding:30px;
+  }
+  .full .em{ font-size:34px; display:block; margin-bottom:14px; }
+  .full .t{ font-size:14.5px; line-height:1.8; color:var(--ink-2); }
+  .full button{
+    margin-top:18px; padding:11px 26px; border:none; border-radius:20px;
+    background:var(--coral); color:#fff; font-size:14.5px; font-weight:600;
+    font-family:inherit; cursor:pointer;
+  }
+
+  /* ============ 小问常驻条 ============ */
+  .topbar{ display:flex; align-items:center; gap:9px; padding:14px 16px 10px; flex-shrink:0; }
+  .pal{
+    flex:1; min-width:0;
+    display:flex; align-items:center; gap:11px; cursor:pointer;
+    background:#fff; border:1px solid var(--line); border-radius:20px;
+    padding:11px 15px; box-shadow:0 2px 12px rgba(255,107,74,.05);
+  }
+  .voiceBtn{
+    width:46px; height:46px; flex-shrink:0; border-radius:50%;
+    border:1px solid var(--line); background:#fff;
+    font-size:18px; line-height:1; cursor:pointer; transition:opacity .15s;
+  }
+  .voiceBtn.off{ opacity:.38; }
+  .pal .av{
+    width:38px; height:38px; border-radius:50%; background:var(--coral-soft);
+    display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
+  }
+  .pal .who{ flex:1; min-width:0; }
+  .pal b{ font-size:14.5px; display:block; }
+  .pal small{ font-size:12.5px; color:var(--ink-2); }
+  .pal .chev{ color:var(--ink-2); font-size:13px; }
+
+  /* ============ 材料条 ============ */
+  .meter{ flex-shrink:0; background:#fff; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .mhead{ display:flex; align-items:center; gap:9px; padding:12px 16px; }
+  .mtitle{ flex:1; min-width:0; font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* 让用户一眼知道"这是讲 AI 的" */
+  .mtype{ flex-shrink:0; font-size:11px; font-weight:600; color:var(--coral); background:var(--coral-soft); border-radius:9px; padding:3px 8px; letter-spacing:.2px; }
+  .mhead button{
+    font-size:12px; border:none; border-radius:14px; padding:6px 10px;
+    font-family:inherit; cursor:pointer; flex-shrink:0; white-space:nowrap;
+  }
+  .mswap{ color:var(--coral); background:var(--coral-soft); }
+  .mtoggle{ color:var(--ink-2); background:var(--bg); }
+  .mbody{ max-height:0; overflow:hidden; transition:max-height .3s ease; }
+  .meter.open .mbody{ max-height:38dvh; overflow-y:auto; }
+  .mbody .pin{ padding:0 16px 16px; font-size:14.5px; line-height:1.8; color:#4A443F; white-space:pre-wrap; }
+  .mbody .broken{ padding:0 16px 14px; font-size:13px; color:var(--warn); }
+
+  /* ============ 对话流 ============ */
+  #chat{ flex:1; overflow-y:auto; padding:18px 16px 8px; }
+  .msg{ display:flex; margin-bottom:15px; }
+  .msg .b{
+    max-width:80%; padding:11px 15px; font-size:15.5px; line-height:1.65;
+    white-space:pre-wrap; word-break:break-word; border-radius:18px;
+  }
+  .msg.bot .b{ background:#fff; border-bottom-left-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .msg.me{ justify-content:flex-end; }
+  .msg.me .b{ background:var(--coral); color:#fff; border-bottom-right-radius:6px; }
+  .typing{ color:var(--ink-2); font-size:14px; padding:0 0 14px 4px; }
+
+  /* 发言失败：留在对话流里，可重试 */
+  .errbar{
+    display:flex; align-items:center; gap:9px; margin:0 0 15px;
+    background:var(--warn-soft); border-radius:14px; padding:11px 14px;
+    font-size:13.5px; color:var(--warn);
+  }
+  .errbar .re{
+    margin-left:auto; background:var(--warn); color:#fff; border:none;
+    border-radius:11px; padding:6px 13px; font-size:12.5px; font-family:inherit; cursor:pointer;
+  }
+  .errbar .why{ font-size:11.5px; opacity:.75; margin-top:2px; }
+
+  /* 她递的下一张材料 */
+  .nextcard{
+    background:#fff; border:1.5px solid var(--coral); border-radius:18px;
+    padding:15px 16px; margin:0 0 16px;
+    animation:cardIn .32s cubic-bezier(.32,.72,0,1);
+  }
+  @keyframes cardIn{ from{ opacity:0; transform:translateY(10px) scale(.97); } }
+  .nextcard .nc-t{ font-size:15px; font-weight:600; margin-bottom:12px; }
+  .nextcard .nc-b{ display:flex; gap:9px; }
+  .nextcard .nc-b button{
+    flex:1; padding:10px; border:none; border-radius:13px;
+    font-size:14px; font-family:inherit; cursor:pointer; font-weight:600;
+  }
+  .nextcard .go{ background:var(--coral); color:#fff; }
+  .nextcard .no{ background:var(--bg); color:var(--ink-2); font-weight:400; }
+
+  /* ============ 输入 ============ */
+  footer{ padding:10px 14px 14px; border-top:1px solid var(--line); flex-shrink:0; }
+  .inputrow{ display:flex; gap:8px; align-items:flex-end; }
+  #input{
+    flex:1; padding:12px 16px; border:1px solid var(--line); border-radius:22px;
+    font-size:15.5px; outline:none; background:#fff; font-family:inherit;
+    transition:border-color .15s; resize:none; line-height:1.45; max-height:96px;
+  }
+  #input:focus{ border-color:var(--coral); }
+  #input:disabled{ background:#F7F2EE; color:var(--ink-2); }
+  #send{
+    width:46px; height:46px; border:none; border-radius:50%; font-size:19px; flex-shrink:0;
+    background:var(--coral); color:#fff; cursor:pointer; transition:transform .12s;
+  }
+  #send:active{ transform:scale(.93); }
+  #send:disabled{ background:#DED5CF; }
+
+  /* ============ 面板 ============ */
+  .sheet{ position:fixed; inset:0; background:rgba(43,39,36,.34); z-index:30; display:none; align-items:flex-end; justify-content:center; }
+  .sheet.open{ display:flex; }
+  /* 学习本走左侧抽屉——它是"段导航"，不是一次性的弹窗 */
+  .sheet.side{ justify-content:flex-start; align-items:stretch; }
+  .sheet.side .panel{
+    width:82%; max-width:340px; max-height:none; border-radius:0 24px 24px 0;
+    animation:slideIn .26s cubic-bezier(.32,.72,0,1);
+  }
+  @keyframes slideIn{ from{ transform:translateX(-100%); } }
+  .sheet .panel{
+    width:100%; max-width:520px; max-height:80dvh; background:var(--bg);
+    border-radius:24px 24px 0 0; display:flex; flex-direction:column;
+    animation:slideUp .26s cubic-bezier(.32,.72,0,1);
+  }
+  @keyframes slideUp{ from{ transform:translateY(100%); } }
+  .sheet .ptop{ display:flex; align-items:center; padding:18px 20px 12px; flex-shrink:0; }
+  .sheet .ptop b{ flex:1; font-size:16px; }
+  .sheet .ptop button{
+    border:none; background:var(--line); color:var(--ink-2); width:28px; height:28px;
+    border-radius:50%; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  .sheet .plist{ overflow-y:auto; padding:0 16px 24px; }
+  .sect{ font-size:12.5px; color:var(--ink-2); margin:14px 4px 9px; letter-spacing:.3px; }
+  .item{
+    background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:9px;
+    box-shadow:0 2px 10px rgba(255,107,74,.05); cursor:pointer;
+  }
+  .item:active{ background:var(--coral-soft); }
+  .item .it-t{ font-size:15px; font-weight:600; }
+  .item .it-n{ font-size:12.5px; color:#B8AEA7; line-height:1.5; margin-top:3px; }
+  .item .it-s{ font-size:13px; color:var(--ink-2); line-height:1.6; margin-top:5px; }
+  .item .it-d{ font-size:11.5px; color:#B8AEA7; margin-top:7px; }
+  .item .it-cur{ font-size:11.5px; color:var(--coral); margin-left:8px; font-weight:500; }
+  .pintro{ font-size:13.5px; color:var(--coral); margin:2px 4px 12px; }
+  .item.cur{ outline:2px solid var(--coral); outline-offset:-2px; }
+  .pempty{ text-align:center; padding:34px 16px; color:var(--ink-2); font-size:13.5px; line-height:1.8; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 加载态 -->
+  <div id="boot">
+    <div class="sk h34"></div>
+    <div style="height:16px"></div>
+    <div class="sk h22 w60"></div>
+    <div class="sk w85"></div>
+    <div class="sk w85"></div>
+    <div class="sk w40"></div>
+    <div class="hint">小问正在来…</div>
+  </div>
+
+  <!-- 整屏空态 / 错误态 -->
+  <div id="full" class="full" hidden>
+    <div>
+      <span class="em" id="fullEm"></span>
+      <div class="t" id="fullText"></div>
+      <button id="fullBtn" hidden>重试</button>
+    </div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="main" hidden style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+
+    <div class="topbar">
+      <div class="pal" id="palBtn">
+        <div class="av">🙋</div>
+        <div class="who"><b>小问</b><small id="palLine"></small></div>
+        <span class="chev">▸</span>
+      </div>
+      <button class="voiceBtn" id="voiceBtn" title="小问的语音播报">🔊</button>
+    </div>
+
+    <div class="meter" id="meter">
+      <div class="mhead">
+        <span class="mtype" id="mType"></span>
+        <div class="mtitle" id="mTitle"></div>
+        <button class="mswap" id="mSwap">换个材料</button>
+        <button class="mtoggle" id="mToggle">展开</button>
+      </div>
+      <div class="mbody"><div class="pin" id="mBody"></div></div>
+    </div>
+
+    <div id="chat"></div>
+
+    <footer>
+      <div class="inputrow">
+        <textarea id="input" rows="1" placeholder="讲讲你的理解…（可以用输入法的语音说）" autocomplete="off"></textarea>
+        <button id="send">↑</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- 面板 -->
+<div class="sheet side" id="sheet">
+  <div class="panel">
+    <div class="ptop"><b>小问的学习本</b><button id="sheetClose">✕</button></div>
+    <div class="plist" id="plist"></div>
+  </div>
+</div>
+
+<!-- 她的声音 -->
+<div class="sheet" id="voiceSheet">
+  <div class="panel">
+    <div class="ptop"><b>她的声音</b><button id="voiceClose">✕</button></div>
+    <div class="plist" id="voiceList"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+    V0.3 · 3a —— 界面重写（唯一对话流 + 材料条 + 「小问记住了」）
+    记忆暂存 localStorage；3b 会换成后端 memory.json
+   ========================================================================= */
+
+const LS_DEVICE = 'jgpnt_device';
+const TIMEOUT = 90000;   // 等第一个字的时限（混元忽快忽慢，实测 1.6s ~ 24s）
+const STALL = 30000;     // 开始出字之后，卡住这么久就算断了
+const CARD_PAUSE = 4000; // 她那段话吐完之后，再等这么久才弹「下一张材料」卡片（要留出读完+想一想的空）
+
+let TOPICS = [];
+let mem = {};            // { 材料id: {summary, at} }
+let cur = null;          // 当前材料
+let sessions = {};       // { 材料id: [messages] } —— 一张材料一段对话
+let history = [];        // 当前那段的 messages（就是 sessions[cur.id] 本身）
+let busy = false;
+let pending = null;      // 发送失败时留着重试的那条
+let autoExpand = true;   // 用户一旦开口，就不再自动展开材料条
+const offered = new Set();   // 她递过的材料——同一张只递一次，别催
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+/* ---------------- 设备 id（记忆按设备分组，存在后端） ---------------- */
+function deviceId(){
+  let id = '';
+  try { id = localStorage.getItem(LS_DEVICE) || ''; } catch(e){}
+  if (!id){
+    id = 'd' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    try { localStorage.setItem(LS_DEVICE, id); } catch(e){ /* 无痕模式：这次会话的记忆不跨天 */ }
+  }
+  return id;
+}
+
+/* 她懂了 —— 后端已在同一次请求里存好了，这里只更新眼前这屏（不再靠前端存） */
+function remember(id, summary){
+  if (!summary) return;                       // 总结为空 → 当作没懂
+  mem[id] = { summary: summary };
+  renderPal();
+}
+
+/* ---------------- 启动 ---------------- */
+async function boot(){
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+    const dev = encodeURIComponent(deviceId());
+    const [list, memory, past] = await Promise.all([
+      fetch('/api/topics', { signal: ctrl.signal }).then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }),
+      // 记忆和历史拉不到都不算致命
+      fetch('/api/memory?device_id=' + dev, { signal: ctrl.signal })
+        .then(r => r.ok ? r.json() : {}).catch(() => ({})),
+      fetch('/api/history?device_id=' + dev, { signal: ctrl.signal })
+        .then(r => r.ok ? r.json() : {}).catch(() => ({})),
+    ]);
+    clearTimeout(timer);
+
+    if (!Array.isArray(list) || list.length === 0){
+      return fullScreen('📄', '现在还没有能讲的材料。<br>等有了再来。', null);
+    }
+    TOPICS = list;
+    mem = (memory && typeof memory === 'object') ? memory : {};
+
+    // 一段对话 = 一张材料（甲方案）。她只有一个，记忆是全局的——分成段也不会长成"三个小问"
+    const rec = (past && typeof past === 'object') ? past : {};
+    const saved = (rec.sessions && typeof rec.sessions === 'object') ? rec.sessions : {};
+    sessions = {};
+    Object.keys(saved).forEach(id => {
+      const msgs = (saved[id] && Array.isArray(saved[id].messages)) ? saved[id].messages : [];
+      if (msgs.length) sessions[id] = msgs;
+    });
+
+    // 上次聊到哪张，就还回到哪张；没有的话取第一张还没讲过的
+    const lastTopic = rec.cur && TOPICS.some(t => t.id === rec.cur) ? rec.cur : null;
+    cur = TOPICS.find(t => t.id === lastTopic)
+       || TOPICS.find(t => !mem[t.id]) || TOPICS[0];
+    history = sessionOf(cur.id);
+
+    $('boot').hidden = true;
+    $('main').hidden = false;
+    renderPal();
+    renderVoice();
+
+    const wantGreet = greetWanted();    // 顺手把"上次打开时间"更新掉
+    renderMeter();
+    if (history.length){
+      autoExpand = false;              // 已经在聊了，材料条别自动摊开
+      renderChat();
+      if (wantGreet) addGreeting();    // 隔得久了，才补一句
+    } else {
+      addGreeting();
+    }
+  } catch(e){
+    fullScreen('🔌', '没能拿到材料。<br>检查下服务是不是没启动。', boot);
+  }
+}
+
+/* ---------------- 她的声音 ----------------
+   静音时**完全不请求**后端——所以不消耗语音额度。
+   语音和打字机**同时开始**，不求严格同步（豆包也是字出完了声音还在读）。 */
+const LS_VOICE = 'jgpnt_voice';
+const LS_VOICE_TYPE = 'jgpnt_voice_type';
+// 静音时用：iOS 要求音频必须先在用户手势里"解锁"过，之后才能自动播
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
+/* 她可以用的音色（腾讯云 TTS）
+   实测这批能用：501000–501007（智字辈）、601008–601014（爱字辈）；
+   4xxxx / 502xxx / 603xxx 报"额度耗尽"。
+   眼下留三个备选，其余删了——想加回来把 id 填进 VOICES 就行。 */
+const VOICES = [
+  { id: 501004, tag: '聊天女声' },
+  { id: 601013, tag: '甜一点的女声' },
+  { id: 501006, tag: '男声' },
+  { id: 501000, tag: '候选，听听看' },
+  { id: 501002, tag: '候选，听听看' },
+];
+const VOICE_NAMES = { 501004: '月华', 601013: '爱小伊', 501006: '千嶂' };
+const PREVIEW_TEXT = '诶你来了，上次你跟我讲的那个，我这两天还想着呢。';
+
+let voiceOn = true;
+try { voiceOn = localStorage.getItem(LS_VOICE) !== '0'; } catch(e){}
+
+let voiceType = 501004;
+try { voiceType = Number(localStorage.getItem(LS_VOICE_TYPE)) || 501004; } catch(e){}
+
+let audioEl = null, audioURL = null, unlocked = false;
+function audioBox(){ if (!audioEl) audioEl = new Audio(); return audioEl; }
+
+function renderVoice(){
+  const b = $('voiceBtn');
+  b.textContent = voiceOn ? '🔊' : '🔇';
+  b.classList.toggle('off', !voiceOn);
+}
+
+function unlockAudio(){
+  if (unlocked) return;
+  unlocked = true;
+  const a = audioBox();
+  a.src = SILENT_WAV;
+  a.play().catch(() => {});
+}
+
+async function playTTS(text, voice){
+  try {
+    const r = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, voice: voice }),
+    });
+    if (!r.ok) return false;               // 语音挂了就挂了吧，不打扰用户
+    const blob = await r.blob();
+    if (audioURL) URL.revokeObjectURL(audioURL);
+    audioURL = URL.createObjectURL(blob);
+    const a = audioBox();
+    a.src = audioURL;
+    a.play().catch(() => {});
+    return true;
+  } catch(e){ return false; }              // 静默失败——文字照常
+}
+
+function speak(text){
+  if (!voiceOn || !text) return;
+  playTTS(text, voiceType);
+}
+
+/* ---------------- 她的声音 面板 ---------------- */
+function voiceName(id){ return VOICE_NAMES[id] || ('音色 ' + id); }
+
+function openVoice(){
+  $('input').blur();
+  const list = $('voiceList');
+  list.innerHTML = '';
+
+  // 开关
+  const sw = document.createElement('div');
+  sw.className = 'item';
+  sw.innerHTML = `<div class="it-t">语音播报<span style="float:right;color:${voiceOn ? 'var(--coral)' : 'var(--ink-2)'};font-weight:500">${voiceOn ? '开' : '关'}</span></div>`;
+  sw.onclick = () => {
+    voiceOn = !voiceOn;
+    try { localStorage.setItem(LS_VOICE, voiceOn ? '1' : '0'); } catch(e){}
+    renderVoice();
+    if (!voiceOn && audioEl){ audioEl.pause(); audioEl.currentTime = 0; }
+    openVoice();
+  };
+  list.appendChild(sw);
+
+  list.insertAdjacentHTML('beforeend', '<div class="sect">音色（点「试听」听一句）</div>');
+  VOICES.forEach(v => {
+    const el = document.createElement('div');
+    el.className = 'item' + (v.id === voiceType ? ' cur' : '');
+    el.innerHTML =
+      `<div class="it-t">${voiceName(v.id)}${v.id === voiceType ? '<span class="it-cur">当前</span>' : ''}</div>` +
+      `<div class="it-s" style="display:flex;align-items:center;gap:10px">
+         <span>${v.tag}</span>
+         <button class="tryBtn" data-id="${v.id}" style="margin-left:auto;border:1px solid var(--line);background:var(--bg);border-radius:11px;padding:5px 12px;font-size:12.5px;font-family:inherit;color:var(--coral);cursor:pointer">试听</button>
+       </div>`;
+    el.onclick = e => {
+      if (e.target.classList.contains('tryBtn')){ previewVoice(Number(e.target.dataset.id)); return; }
+      voiceType = v.id;
+      try { localStorage.setItem(LS_VOICE_TYPE, String(v.id)); } catch(e){}
+      openVoice();                      // 重建列表，选中标记跟着走
+    };
+    list.appendChild(el);
+  });
+
+  $('voiceSheet').classList.add('open');
+}
+
+function previewVoice(id){
+  unlockAudio();                        // 试听也是用户点的，顺手解锁
+  playTTS(PREVIEW_TEXT, id);
+}
+
+$('voiceBtn').onclick = openVoice;
+$('voiceClose').onclick = () => $('voiceSheet').classList.remove('open');
+$('voiceSheet').onclick = e => { if (e.target.id === 'voiceSheet') $('voiceSheet').classList.remove('open'); };
+
+/* 隔了较久才补一句问候——不然每次打开都"诶你来了"，很啰嗦 */
+const LS_SEEN = 'jgpnt_last_open';
+const GREET_GAP = 6 * 3600 * 1000;   // 6 小时
+
+function greetWanted(){
+  let last = 0;
+  try { last = Number(localStorage.getItem(LS_SEEN)) || 0; } catch(e){}
+  const now = Date.now();
+  try { localStorage.setItem(LS_SEEN, String(now)); } catch(e){}
+  return now - last > GREET_GAP;
+}
+
+function addGreeting(){
+  const hello = opening();
+  say(hello);
+  history.push({ role: 'assistant', content: hello });
+  scrollDown();
+  speak(hello);       // 还没解锁时会静默失败，无所谓
+}
+
+/* 开场白：她一张口，你就该感觉到"她变了"——她带着记忆说话
+   第一次来：和以前一样。来过之后：随机挑一条学过的，随机挑一种说法（免得天天一样） */
+function opening(){
+  const ids = Object.keys(mem).filter(id => TOPICS.some(t => t.id === id));
+  if (!ids.length) return '诶，你刚看的那篇讲啥的？说来听听，我不太懂这个。';
+
+  const pickId = ids[Math.floor(Math.random() * ids.length)];
+  const t = TOPICS.find(x => x.id === pickId);
+  const name = t ? shortName(t) : '那个';
+  const lines = [
+    `诶，你来了。上次你跟我讲那个${name}，我这两天还想着呢。`,
+    `你上回跟我讲${name}的时候，我到现在都记着。`,
+    `我最近老想起你跟我讲的${name}。`,
+    `诶，${name}那个我还记得。你最近又看啥了？`,
+    `上次你讲的${name}，我琢磨了好几天。`,
+  ];
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+function niceDate(iso){
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${+m[2]} 月 ${+m[3]} 日` : '';
+}
+
+/* 短名：优先用材料自带的 name；没有才从标题里抠（「大模型的「温度」是什么？」→ 温度） */
+function shortName(t){
+  if (t && t.name) return t.name;
+  const s = String((t && t.title) || t || '').replace(/[？?！!]/g, '');
+  const m = s.match(/[「『]([^」』]+)[」』]/);
+  if (m) return m[1];
+  return s.replace(/^什么是/, '').replace(/是什么$/, '');
+}
+
+function fullScreen(em, html, retry){
+  $('boot').hidden = true;
+  $('main').hidden = true;
+  $('fullEm').textContent = em;
+  $('fullText').innerHTML = html;
+  $('fullBtn').hidden = !retry;
+  $('fullBtn').onclick = retry;
+  $('full').hidden = false;
+}
+
+/* ---------------- 渲染 ---------------- */
+function renderPal(){
+  const n = Object.keys(mem).length;
+  $('palLine').textContent = n === 0
+    ? '我还不懂这些，你挑一个讲给我听'
+    : `我记住 ${n} 个了，你挑一个接着讲`;
+}
+
+function renderMeter(){
+  $('mTitle').textContent = cur.title || '未命名材料';
+  const ty = $('mType');
+  ty.textContent = cur.type || '';
+  ty.hidden = !cur.type;
+  const body = $('mBody');
+  if (cur.content){
+    body.className = 'pin';
+    body.textContent = cur.content;
+  } else {
+    // 降级：正文没读到，对话照常
+    body.className = 'broken';
+    body.textContent = '这篇的正文没读到，你可以先讲你记得的。';
+  }
+  const open = autoExpand && !mem[cur.id];
+  $('meter').classList.toggle('open', open);
+  $('mToggle').textContent = open ? '收起' : '展开';
+}
+
+function say(text){
+  const d = document.createElement('div');
+  d.className = 'msg bot';
+  const b = document.createElement('div');
+  b.className = 'b';
+  b.textContent = text;
+  d.appendChild(b);
+  $('chat').appendChild(d);
+  scrollDown();
+  return b;                 // 返回气泡本体，流式渲染要一直改它
+}
+function echo(text){
+  const d = document.createElement('div');
+  d.className = 'msg me';
+  d.innerHTML = `<div class="b">${esc(text)}</div>`;
+  $('chat').appendChild(d);
+  scrollDown();
+}
+function scrollDown(){ const c = $('chat'); c.scrollTop = c.scrollHeight; }
+
+/* ---------------- 打字机 ----------------
+   后端是一大块一大块推过来的（实测 78 个字 0.6 秒全到），直接渲染会看花眼。
+   所以这里做平滑吐字：落后越多吐得越快，追上就等。
+   前端"吐完"之后才算这条消息真的说完——后面的动作（弹卡片）都挂在它身上。 */
+const typer = {
+  bubble: null, target: '', shown: 0, ended: false, cb: null, timer: null,
+
+  begin(bubble){ this.bubble = bubble; this.target = ''; this.shown = 0; this.ended = false; this.cb = null; this.stop(); },
+  feed(text){ this.setTarget(text); this.run(); },
+  finish(text, cb){ this.setTarget(text); this.ended = true; this.cb = cb; this.run(); },
+  stop(){ if (this.timer){ clearTimeout(this.timer); this.timer = null; } },
+  reset(){ this.stop(); this.bubble = null; this.target = ''; this.shown = 0; this.ended = false; this.cb = null; },
+
+  setTarget(text){
+    this.target = text;
+    if (this.shown > text.length) this.shown = text.length;   // 剥标记时文本会回退，钳一下
+  },
+  run(){
+    if (this.timer) return;
+    const step = () => {
+      this.timer = null;
+      if (!this.bubble) return;
+      const gap = this.target.length - this.shown;
+      if (gap > 0){
+        // 正常一个字一个字吐（约 24 字/秒，比默读快一点，不晃眼）
+        // 只有落后特别多时才吐快点，免得长回复等太久
+        const fast = gap > 80;
+        this.shown = Math.min(this.target.length, this.shown + (fast ? 2 : 1));
+        this.bubble.textContent = this.target.slice(0, this.shown);
+        scrollDown();
+        this.timer = setTimeout(step, fast ? 21 : 42);
+      } else if (this.ended && this.cb){
+        const cb = this.cb; this.cb = null;
+        cb();
+      }
+    };
+    step();
+  },
+};
+
+let typingTimer = null;
+function showTyping(){
+  hideTyping();
+  const t = document.createElement('div');
+  t.className = 'typing'; t.id = 'typing'; t.textContent = '小问正在听…';
+  $('chat').appendChild(t); scrollDown();
+  // 她偶尔想得久，别让用户对着同一句话干等
+  typingTimer = setTimeout(() => {
+    const el = $('typing');
+    if (el) el.textContent = '小问还在想…';
+  }, 8000);
+}
+function hideTyping(){
+  if (typingTimer) { clearTimeout(typingTimer); typingTimer = null; }
+  const t = $('typing'); if (t) t.remove();
+}
+
+function showErrBar(reason){
+  hideErrBar();
+  const d = document.createElement('div');
+  d.className = 'errbar'; d.id = 'errbar';
+  d.innerHTML = '<span>⚠</span><div><div>没发出去</div>' +
+    (reason ? `<div class="why">${esc(reason)}</div>` : '') +
+    '</div><button class="re" id="retryBtn">重试</button>';
+  $('chat').appendChild(d); scrollDown();
+  $('retryBtn').onclick = () => { hideErrBar(); sendText(pending, true); };
+}
+function hideErrBar(){ const e = $('errbar'); if (e) e.remove(); }
+
+/* ---------------- 一段对话 ----------------
+   一张材料一段对话。小问始终是同一个——记忆不分段、全局共享，
+   所以切成一段一段，也不会长成"三个小问，各记各的"。 */
+function sessionOf(id){
+  if (!Array.isArray(sessions[id])) sessions[id] = [];
+  return sessions[id];
+}
+function renderChat(){
+  $('chat').innerHTML = '';
+  hideErrBar();
+  history.forEach(m => m.role === 'user' ? echo(m.content) : say(m.content));
+}
+
+/* 切到某一段：材料条和对话流一起换过去 */
+function pick(t){
+  if (cur && t.id === cur.id){ closeSheet(); return; }
+  cur = t;
+  history = sessionOf(t.id);
+  autoExpand = history.length === 0;   // 这段还没聊过 → 摊开材料；聊过 → 直接看对话
+  renderMeter();
+  renderChat();
+  closeSheet();
+  // 换段是静默的 —— 她不开口；也不弹输入法，用户得先看材料
+}
+
+/* ---------------- 面板 ---------------- */
+function openSheet(){
+  $('input').blur();   // 收起键盘，让面板完整可见
+  const list = $('plist');
+  const undone = TOPICS.filter(t => !mem[t.id]);
+  const done   = TOPICS.filter(t => mem[t.id]);
+  list.innerHTML = '';
+  const item = (t, withSummary) => {
+    const el = document.createElement('div');
+    el.className = 'item' + (t.id === cur.id ? ' cur' : '');
+    const d = withSummary ? niceDate(mem[t.id] && mem[t.id].at) : '';
+    const curTag = t.id === cur.id ? '<span class="it-cur">当前</span>' : '';
+    // 讲过的：名词当头（找东西先认名词），标题退成小字注脚
+    const head = withSummary
+      ? `<div class="it-t">${esc(t.name || t.title || '未命名材料')}${curTag}</div>` +
+        (t.name && t.title ? `<div class="it-n">${esc(t.title)}</div>` : '')
+      : `<div class="it-t">${esc(t.title || '未命名材料')}${curTag}</div>`;
+    el.innerHTML =
+      head +
+      (withSummary && mem[t.id].summary ? `<div class="it-s">🙋 ${esc(mem[t.id].summary)}</div>` : '') +
+      (d ? `<div class="it-d">${d}</div>` : '');
+    el.onclick = () => pick(t);
+    return el;
+  };
+  if (undone.length){
+    list.insertAdjacentHTML('beforeend', `<div class="sect">还没讲的（${undone.length}）</div>`);
+    undone.forEach(t => list.appendChild(item(t, false)));
+  }
+  if (done.length){
+    // 主语是"你"——这不是她的收藏夹，是你做出来的东西
+    list.insertAdjacentHTML('beforeend',
+      `<div class="sect">你跟她讲过的（${done.length}）</div>` +
+      `<div class="pintro">这些都是你跟我讲过的。</div>`);
+    done.forEach(t => list.appendChild(item(t, true)));
+  }
+  if (!undone.length && !done.length){
+    list.insertAdjacentHTML('beforeend', '<div class="pempty">还没有材料。</div>');
+  }
+  $('sheet').classList.add('open');
+}
+function closeSheet(){ $('sheet').classList.remove('open'); }
+
+/* ---------------- 发送 ---------------- */
+async function sendText(text, isRetry){
+  text = (text || '').trim();
+  if (!text || busy) return;
+
+  busy = true;
+  pending = text;
+  unlockAudio();          // 这是用户手势，趁机把音频解锁了（iOS 要用）
+  $('send').disabled = true;
+  $('input').disabled = true;
+
+  if (!isRetry) echo(text);
+  const seg = history;          // 这次请求属于这一段——中途切走了也不会串到别的段
+  const topicId = cur.id;
+  history.push({ role: 'user', content: text });
+
+  // 一开口就把材料条收起来，把屏幕让给对话
+  autoExpand = false;
+  $('meter').classList.remove('open');
+  $('mToggle').textContent = '展开';
+  $('input').value = '';
+  autosize($('input'));
+  showTyping();
+
+  let bubble = null;       // 她的气泡——第一块字到了才建
+  let reason = '';
+  try {
+    const ctrl = new AbortController();
+    let timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+    const bump = () => { clearTimeout(timer); timer = setTimeout(() => ctrl.abort(), STALL); };
+
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic_id: topicId, messages: seg, device_id: deviceId() }),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) throw new Error('服务返回 ' + r.status);
+    bump();                                  // 连上了，之后按"有没有动静"计时
+
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', final = null;
+
+    while (true){
+      const { done, value } = await reader.read();
+      if (done) break;
+      bump();
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n\n')) !== -1){
+        const block = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        const line = block.split('\n').find(l => l.startsWith('data:'));
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(5).trim()); } catch(err){ continue; }
+        if (ev.error) throw new Error(String(ev.error).slice(0, 80));
+        if (typeof ev.t === 'string'){
+          hideTyping();
+          if (!bubble){ bubble = say(''); typer.begin(bubble); }
+          typer.feed(ev.t);                  // 交给打字机平滑吐，不直接拍上去
+        }
+        if (ev.done) final = ev;
+      }
+    }
+    clearTimeout(timer);
+    if (!final) throw new Error('她没说完就断了');
+
+    hideTyping();
+    const clean = String(final.reply || '');
+    seg.push({ role: 'assistant', content: clean });
+    if (final.understood && final.summary) remember(topicId, final.summary);   // 后端已记账
+    speak(clean);            // 声音和打字机一起开始，不去对齐（对齐反而更假）
+
+    const nextId = final.next_id;
+    const nextT = (nextId && !offered.has(nextId)) ? TOPICS.find(x => x.id === nextId) : null;
+    if (nextT && !mem[nextT.id]) offered.add(nextT.id);
+
+    // 等她这段话**吐完**，再停一下才弹卡片——让他先读完、想一想
+    typer.finish(clean, () => {
+      if (nextT && !mem[nextT.id]){
+        setTimeout(() => {
+          if (!document.querySelector('.nextcard')) nextCard(nextT);
+        }, CARD_PAUSE);
+      }
+    });
+    pending = null;
+  } catch(e){
+    hideTyping();
+    typer.reset();
+    // 失败的那条从上下文里撤掉，免得留下连续两条 user 把后面的请求带坏
+    seg.pop();
+    if (bubble && bubble.parentNode) bubble.parentNode.remove();   // 半截的先撤掉，重试才干净
+    reason = (e && e.name === 'AbortError')
+      ? '她 ' + (STALL / 1000) + ' 秒没动静了'
+      : (e && e.message ? e.message : '未知错误');
+    showErrBar(reason);
+  }
+  busy = false;
+  $('send').disabled = false;
+  $('input').disabled = false;
+  // 故意不 focus —— 每次回复完都弹输入法，会把对话遮住
+}
+
+/* 隐藏标记的剥离已挪到后端（chat.py 的 parse_reply），前端只认结构化字段 */
+
+/* 她递的下一张：对话流里的一张卡，两个出口 */
+function nextCard(t){
+  const d = document.createElement('div');
+  d.className = 'nextcard';
+  d.innerHTML =
+    `<div class="nc-t">📄 ${esc(t.title || '未命名材料')}</div>
+     <div class="nc-b"><button class="go">去看看</button><button class="no">下次吧</button></div>`;
+  $('chat').appendChild(d); scrollDown();
+  d.querySelector('.go').onclick = () => {
+    pick(t);                                   // 切到新的一段（重画对话流，这张卡跟着没了）
+    $('meter').classList.add('open');          // 让她递的这张直接摊开，用户顺着读
+    $('mToggle').textContent = '收起';
+  };
+  d.querySelector('.no').onclick = () => {
+    // 拒绝也该是她开口，不是界面上冒一块灰字
+    d.remove();
+    const line = '行，那不急。你想讲了再跟我说。';
+    say(line);
+    history.push({ role: 'assistant', content: line });
+  };
+}
+
+/* ---------------- 输入框自增高（最多 3 行） ---------------- */
+function autosize(el){
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 96) + 'px';
+}
+
+/* ---------------- 事件 ---------------- */
+$('palBtn').onclick = openSheet;
+$('mSwap').onclick = openSheet;
+$('sheetClose').onclick = closeSheet;
+$('sheet').onclick = e => { if (e.target.id === 'sheet') closeSheet(); };
+
+$('mToggle').onclick = () => {
+  const m = $('meter');
+  m.classList.toggle('open');
+  $('mToggle').textContent = m.classList.contains('open') ? '收起' : '展开';
+};
+
+$('send').onclick = () => sendText($('input').value, false);
+$('input').addEventListener('input', e => autosize(e.target));
+$('input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendText($('input').value, false); }
+});
+
+boot();
+</script>
+</body>
+</html>
