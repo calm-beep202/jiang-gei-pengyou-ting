@@ -1,0 +1,24 @@
+# 密钥——绝对不能上传
+.env
+.env.*
+*.env
+
+# 用户数据（记忆 + 对话历史，含个人内容）
+app/memory.json
+app/history.json
+app/*.json.tmp
+
+# Python
+__pycache__/
+*.pyc
+
+# 临时文件
+*.tmp
+_tts_demo/
+
+# 备份文件（memory.json.bak / history.json.bak，含个人数据）
+app/*.bak
+
+# 系统
+.DS_Store
+Thumbs.db

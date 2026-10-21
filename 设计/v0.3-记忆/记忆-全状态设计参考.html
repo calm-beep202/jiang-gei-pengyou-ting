@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>讲给朋友听 · V0.3 记忆 · 全状态设计参考</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --coral:#FF6B4A; --coral-soft:#FFE9E3; --ink:#2B2724; --ink-2:#8A8078;
+    --bg:#FFF9F5; --line:#F0E6DF; --warn:#C2410C; --warn-soft:#FFF1EA; --ok:#2F7A55;
+  }
+  body{
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:#F5F0EC; color:var(--ink); line-height:1.7;
+    padding:32px 20px 80px;
+  }
+  .doc{ max-width:1040px; margin:0 auto; }
+
+  /* ---------- 文档骨架 ---------- */
+  h1{ font-size:25px; letter-spacing:-.3px; margin-bottom:6px; }
+  .meta{ font-size:13px; color:var(--ink-2); margin-bottom:26px; }
+  .meta b{ color:var(--coral); }
+  .toc{
+    background:#fff; border-radius:16px; padding:16px 20px; margin-bottom:34px;
+    box-shadow:0 2px 10px rgba(0,0,0,.03); font-size:14px;
+  }
+  .toc b{ display:block; margin-bottom:8px; font-size:13px; color:var(--ink-2); }
+  .toc a{ color:var(--ink); text-decoration:none; margin-right:16px; display:inline-block; padding:2px 0; }
+  .toc a:hover{ color:var(--coral); }
+
+  section{ margin-bottom:44px; scroll-margin-top:20px; }
+  h2{
+    font-size:18px; margin-bottom:4px; padding-bottom:10px;
+    border-bottom:2px solid var(--line); display:flex; align-items:center; gap:9px;
+  }
+  .chip{
+    font-size:11px; font-weight:500; padding:3px 9px; border-radius:20px;
+    background:var(--coral-soft); color:var(--coral);
+  }
+  .chip.gray{ background:#EFEAE6; color:var(--ink-2); }
+  .chip.warn{ background:var(--warn-soft); color:var(--warn); }
+  .lead{ font-size:13.5px; color:var(--ink-2); margin:12px 0 18px; }
+  .lead b{ color:var(--ink); }
+
+  /* ---------- 手机预览 ---------- */
+  .phone{
+    width:300px; flex-shrink:0; background:var(--bg); border-radius:20px;
+    overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,.09);
+    display:flex; flex-direction:column; height:430px; border:1px solid #E6DED8;
+  }
+  .p-top{ padding:11px 12px 8px; flex-shrink:0; }
+  .p-pal{
+    display:flex; align-items:center; gap:8px; background:#fff;
+    border:1px solid var(--line); border-radius:14px; padding:8px 11px;
+  }
+  .p-pal .av{ width:26px; height:26px; border-radius:50%; background:var(--coral-soft); display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .p-pal .tx{ flex:1; min-width:0; }
+  .p-pal b{ font-size:11px; display:block; }
+  .p-pal small{ font-size:9.5px; color:var(--ink-2); }
+  .p-meter{ background:#fff; border-top:1px solid var(--line); border-bottom:1px solid var(--line); flex-shrink:0; }
+  .p-mhead{ display:flex; align-items:center; gap:6px; padding:9px 11px; }
+  .p-mtitle{ flex:1; min-width:0; font-size:11px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .p-btn{ font-size:9px; border-radius:10px; padding:4px 7px; white-space:nowrap; }
+  .p-btn.a{ color:var(--coral); background:var(--coral-soft); }
+  .p-btn.b{ color:var(--ink-2); background:var(--bg); }
+  .p-mbody{ padding:0 11px 11px; font-size:10.5px; line-height:1.7; color:#4A443F; }
+  .p-chat{ flex:1; overflow:hidden; padding:12px 11px 4px; }
+  .p-msg{ display:flex; margin-bottom:10px; }
+  .p-msg .b{ max-width:82%; padding:8px 11px; font-size:11px; line-height:1.55; border-radius:13px; }
+  .p-msg.bot .b{ background:#fff; border-bottom-left-radius:5px; }
+  .p-msg.me{ justify-content:flex-end; }
+  .p-msg.me .b{ background:var(--coral); color:#fff; border-bottom-right-radius:5px; }
+  .p-foot{ padding:8px 11px 11px; border-top:1px solid var(--line); flex-shrink:0; }
+  .p-input{
+    display:flex; gap:6px; align-items:center;
+  }
+  .p-input .f{ flex:1; padding:9px 12px; border:1px solid var(--line); border-radius:16px; font-size:10.5px; background:#fff; color:var(--ink-2); }
+  .p-input .s{ width:32px; height:32px; border-radius:50%; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+  .p-input .s.off{ background:#DED5CF; }
+
+  /* 预览里的特殊块 */
+  .p-typing{ font-size:10.5px; color:var(--ink-2); padding-left:3px; }
+  .p-empty{ text-align:center; padding:38px 16px; color:var(--ink-2); }
+  .p-empty .em{ font-size:26px; display:block; margin-bottom:10px; }
+  .p-empty .t{ font-size:11.5px; line-height:1.7; }
+  .p-err{
+    background:var(--warn-soft); border-radius:12px; padding:10px 12px; margin:0 11px 10px;
+    font-size:10.5px; color:var(--warn); display:flex; align-items:center; gap:7px;
+  }
+  .p-err .re{ margin-left:auto; background:var(--warn); color:#fff; border-radius:9px; padding:4px 8px; font-size:9.5px; }
+  .p-skeleton{ padding:14px 12px; }
+  .sk{ background:#EFE8E3; border-radius:8px; height:11px; margin-bottom:9px; animation:pulse 1.4s ease-in-out infinite; }
+  .sk.w60{ width:60%; } .sk.w85{ width:85%; } .sk.w40{ width:40%; } .sk.h18{ height:18px; }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  .row{ display:flex; gap:26px; align-items:flex-start; flex-wrap:wrap; }
+  .row .txt{ flex:1; min-width:280px; font-size:14px; }
+  .row .txt ul{ padding-left:20px; margin:8px 0; }
+  .row .txt li{ margin-bottom:6px; }
+  .row .txt code{
+    background:#fff; border:1px solid var(--line); border-radius:5px;
+    padding:1px 6px; font-size:12.5px; font-family:ui-monospace,Consolas,monospace;
+  }
+  .tagline{ font-size:13px; color:var(--ink-2); margin-top:10px; }
+  .tagline b{ color:var(--coral); }
+
+  /* ---------- 表格 ---------- */
+  table{ width:100%; border-collapse:collapse; background:#fff; border-radius:14px; overflow:hidden; font-size:13.5px; box-shadow:0 2px 10px rgba(0,0,0,.03); }
+  th{ background:#FBF6F2; text-align:left; font-size:12.5px; color:var(--ink-2); font-weight:600; padding:11px 14px; white-space:nowrap; }
+  td{ padding:11px 14px; border-top:1px solid var(--line); vertical-align:top; }
+  td code{ background:#FBF6F2; border-radius:4px; padding:1px 5px; font-size:12px; font-family:ui-monospace,Consolas,monospace; }
+  tr.hi td{ background:#FFFCFA; }
+
+  .note{
+    background:#fff; border-left:3px solid var(--coral); border-radius:0 12px 12px 0;
+    padding:13px 17px; font-size:13.5px; margin:16px 0;
+  }
+  .note b{ color:var(--coral); }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div style="background:#C2410C;color:#fff;border-radius:12px;padding:11px 16px;
+              font-size:13.5px;margin-bottom:22px">
+    ⚠️ <b>这是 V0.3 设计阶段的稿子，不是现行界面的说明。</b>
+    V0.3 之后界面又演进过：流式输出、打字机效果、语音播报、音色面板。
+    <b>现行界面以 <code>app/static/index.html</code> 为准</b>，设计决策见 <code>docs/prd/</code>。
+    （留着是因为设计过程本身也是项目的一部分。）
+  </div>
+
+  <h1>讲给朋友听 · V0.3 记忆 · 全状态设计参考</h1>
+  <div class="meta">
+    版本 <b>V0.3</b> ｜ 日期 <b>2026-10-10</b> ｜ 配套 <b>记忆-设计稿.html</b>（正常态）
+    <br>前端按这份表实现；缺哪个状态，就是漏了。
+  </div>
+
+  <div class="toc">
+    <b>目录</b>
+    <a href="#s1">1 加载态</a>
+    <a href="#s2">2 空态</a>
+    <a href="#s3">3 正常态</a>
+    <a href="#s4">4 错误态</a>
+    <a href="#s5">5 部分可用</a>
+    <a href="#s6">6 边界情况</a>
+    <a href="#s7">7 Toast 汇总与规则</a>
+    <a href="#s8">8 交互行为规则表</a>
+    <a href="#s9">9 状态 ← 数据映射</a>
+  </div>
+
+  <!-- ================= 1 加载态 ================= -->
+  <section id="s1">
+    <h2><span class="chip gray">加载态</span> 首次打开，还在拉材料</h2>
+    <div class="lead">
+      打开到材料出现之间。**材料列表没回来之前，整屏都是骨架**——包括小问的常驻条。
+      这样用户第一眼看到的是"正在来"，而不是一块空白。
+    </div>
+    <div class="row">
+      <div class="phone">
+        <div class="p-top"><div class="p-pal" style="border-style:dashed">
+          <div class="av" style="opacity:.35">🙋</div>
+          <div class="tx"><b style="opacity:.35">小问</b><small>正在来…</small></div>
+        </div></div>
+        <div class="p-meter"><div class="p-mhead">
+          <div class="p-mtitle" style="color:#C9BFB8">加载中</div>
+        </div></div>
+        <div class="p-chat"><div class="p-skeleton">
+          <div class="sk h18 w60"></div>
+          <div class="sk w85"></div>
+          <div class="sk w85"></div>
+          <div class="sk w40"></div>
+        </div></div>
+        <div class="p-foot"><div class="p-input">
+          <div class="f">讲讲你的理解…</div><div class="s off">↑</div>
+        </div></div>
+      </div>
+      <div class="txt">
+        <ul>
+          <li>骨架屏用**灰块脉动**（1.4s 循环），不用转圈——转圈在手机上显得卡</li>
+          <li>输入框**置灰禁用**（发送键变浅灰），这时点不动</li>
+          <li>超时：超过 <code>20s</code> 没回来 → 转 <b>错误态 A</b></li>
+        </ul>
+        <div class="tagline"><b>为什么整屏骨架</b>：只让材料条转圈、小问条却亮着，会显得页面"半坏"。统一骨架更干净。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2 空态 ================= -->
+  <section id="s2">
+    <h2><span class="chip gray">空态</span> 两种空，别混</h2>
+    <div class="lead">空态有两种，文案和出口都不一样。</div>
+    <div class="row" style="gap:18px">
+
+      <div style="display:flex; flex-direction:column; gap:9px">
+        <div style="font-size:13px;font-weight:600">2.1 一条材料都没有</div>
+        <div class="phone" style="height:330px">
+          <div class="p-top"><div class="p-pal">
+            <div class="av">🙋</div>
+            <div class="tx"><b>小问</b><small>没什么可讲的也成</small></div>
+          </div></div>
+          <div class="p-chat" style="display:flex;align-items:center;justify-content:center">
+            <div class="p-empty">
+              <span class="em">📄</span>
+              <div class="t">现在还没有能讲的材料。<br>等有了再来。</div>
+            </div>
+          </div>
+          <div class="p-foot"><div class="p-input">
+            <div class="f">讲讲你的理解…</div><div class="s off">↑</div>
+          </div></div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:9px">
+        <div style="font-size:13px;font-weight:600">2.2 材料都讲完了</div>
+        <div class="phone" style="height:330px">
+          <div class="p-top"><div class="p-pal">
+            <div class="av">🙋</div>
+            <div class="tx"><b>小问</b><small>我记住 3 个了，你挑一个接着讲</small></div>
+          </div></div>
+          <div class="p-meter"><div class="p-mhead">
+            <div class="p-mtitle">什么是 RAG？</div>
+            <span class="p-btn a">换个材料</span><span class="p-btn b">展开</span>
+          </div></div>
+          <div class="p-chat" style="display:flex;align-items:center;justify-content:center">
+            <div class="p-empty">
+              <span class="em">🙋</span>
+              <div class="t">还没讲的，就剩你手上这张了。</div>
+            </div>
+          </div>
+          <div class="p-foot"><div class="p-input">
+            <div class="f">讲讲你的理解…</div><div class="s">↑</div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="txt">
+        <ul>
+          <li><b>2.1 全空</b>：<code>topics</code> 返回空数组。**没有"换个材料"按钮**——没得换，别给死路。输入框禁用</li>
+          <li><b>2.2 待讲为 0</b>：材料还有，只是都被"讲过了"。**当前材料照常留着**（还能重讲），面板里"还没讲的"区**整块不出现**</li>
+        </ul>
+        <div class="tagline">
+          ⚠️ 注意 2.2 那句"就剩你手上这张了"——<b>不能说"你都讲完了，真棒"</b>。那是打分，是打卡。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3 正常态 ================= -->
+  <section id="s3">
+    <h2><span class="chip">正常态</span> 主流程（详见设计稿）</h2>
+    <div class="lead">这里只标出**三个容易漏的细节**，完整交互见 <b>记忆-设计稿.html</b>。</div>
+    <div class="row">
+      <div class="phone" style="height:400px">
+        <div class="p-top"><div class="p-pal">
+          <div class="av">🙋</div>
+          <div class="tx"><b>小问</b><small>我记住 2 个了，你挑一个接着讲</small></div>
+        </div></div>
+        <div class="p-meter"><div class="p-mhead">
+          <div class="p-mtitle">什么是 RAG？</div>
+          <span class="p-btn a">换个材料</span><span class="p-btn b">展开</span>
+        </div></div>
+        <div class="p-chat">
+          <div class="p-msg bot"><div class="b">诶，你刚看的那篇讲啥的？说来听听，我不太懂这个。</div></div>
+          <div class="p-msg me"><div class="b">就是把资料先查出来再交给模型</div></div>
+          <div class="p-msg bot"><div class="b">哦哦，那"检索"是去哪查的？</div></div>
+        </div>
+        <div class="p-foot"><div class="p-input">
+          <div class="f">讲讲你的理解…</div><div class="s">↑</div>
+        </div></div>
+      </div>
+      <div class="txt">
+        <ul>
+          <li><b>材料条默认展开</b>（让你先读），<b>你一发送就自动收起</b>，把屏幕让给对话；想再读点「展开」</li>
+          <li><b>换材料是静默的</b>——只换材料，她**不开口**。尤其不讲过的材料，绝不把总结念一遍（这条改过一轮，见 PRD 关键决策）</li>
+          <li>她那句总结，只出现在**两个地方**：听懂那一刻的复述、以及「小问记住了」面板里</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4 错误态 ================= -->
+  <section id="s4">
+    <h2><span class="chip warn">错误态</span> 三种错，三种处理</h2>
+    <div class="lead">错误**就地说**，不弹窗、不跳页。用户在哪儿出错，就在哪儿修。</div>
+
+    <div class="row" style="gap:18px">
+      <!-- A -->
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font-size:13px;font-weight:600">4.1 拉材料失败</div>
+        <div class="phone" style="height:360px">
+          <div class="p-top"><div class="p-pal">
+            <div class="av">🙋</div>
+            <div class="tx"><b>小问</b><small>我这边没连上</small></div>
+          </div></div>
+          <div class="p-chat" style="display:flex;align-items:center;justify-content:center">
+            <div class="p-empty">
+              <span class="em">🔌</span>
+              <div class="t">没能拿到材料。<br>检查下服务是不是没启动。</div>
+              <div style="margin-top:14px"><span class="p-btn a" style="font-size:11px;padding:7px 14px">重试</span></div>
+            </div>
+          </div>
+          <div class="p-foot"><div class="p-input">
+            <div class="f">讲讲你的理解…</div><div class="s off">↑</div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- B -->
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font-size:13px;font-weight:600">4.2 发言失败</div>
+        <div class="phone" style="height:360px">
+          <div class="p-top"><div class="p-pal">
+            <div class="av">🙋</div>
+            <div class="tx"><b>小问</b><small>我记住 2 个了，你挑一个接着讲</small></div>
+          </div></div>
+          <div class="p-meter"><div class="p-mhead">
+            <div class="p-mtitle">什么是 RAG？</div>
+            <span class="p-btn a">换个材料</span><span class="p-btn b">展开</span>
+          </div></div>
+          <div class="p-chat">
+            <div class="p-msg me"><div class="b">就是把资料先查出来再交给模型</div></div>
+            <div class="p-err"><span>⚠</span><span>没发出去</span><span class="re">重试</span></div>
+          </div>
+          <div class="p-foot"><div class="p-input">
+            <div class="f">讲讲你的理解…</div><div class="s">↑</div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="txt" style="min-width:260px">
+        <ul>
+          <li><b>4.1</b>：整屏错误 + 「重试」。输入框禁用（说啥都发不出去）</li>
+          <li><b>4.2</b>：用户那条消息**留在原地**（别吞了！），下面跟一条可点重试的提示条。<b>重试 = 用同一条消息重发</b>，不重复上屏</li>
+          <li><b>4.3</b>（没画）：她"懂了"但<b>记忆没写进盘</b> → <b>静默降级</b>。对话照常，"小问记住了"这次不加。用户不需要知道存储层的事</li>
+        </ul>
+        <div class="tagline">
+          ❌ 现在的代码是 <code>addMsg('bot','[出错]…')</code> —— 把报错当聊天发出去，最丑。<b>V0.3 必须换掉。</b>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5 部分可用 ================= -->
+  <section id="s5">
+    <h2><span class="chip warn">部分可用</span> 拿到一半，别整屏崩</h2>
+    <div class="lead">后端可能返回"材料有，但某篇正文是空的/坏的"。**坏一篇，不能坏整屏。**</div>
+    <div class="row">
+      <div class="phone" style="height:340px">
+        <div class="p-top"><div class="p-pal">
+          <div class="av">🙋</div>
+          <div class="tx"><b>小问</b><small>我记住 1 个了，你挑一个接着讲</small></div>
+        </div></div>
+        <div class="p-meter"><div class="p-mhead">
+          <div class="p-mtitle">什么是 RAG？</div>
+          <span class="p-btn a">换个材料</span><span class="p-btn b">展开</span>
+        </div>
+        <div class="p-mbody" style="color:var(--warn);background:var(--warn-soft);padding:10px 11px;font-size:10.5px">
+          这篇的正文没读到，你可以先讲你记得的。
+        </div>
+        <div class="p-chat">
+          <div class="p-msg bot"><div class="b">诶，你刚看的那篇讲啥的？</div></div>
+        </div>
+        <div class="p-foot"><div class="p-input">
+          <div class="f">讲讲你的理解…</div><div class="s">↑</div>
+        </div></div>
+      </div>
+      <div class="txt">
+        <ul>
+          <li>正文缺失 → 材料条里显示一行温和提示，**对话照常**（她还是能听你讲）</li>
+          <li>某条材料的标题缺 → 用「未命名材料」兜底，不显示 <code>undefined</code></li>
+          <li>面板里"小问记住了"某条缺总结 → 只显示标题，不显示空引号</li>
+        </ul>
+        <div class="tagline">原则：<b>能降级的都降级，别把技术故障摊到用户脸上。</b></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6 边界情况 ================= -->
+  <section id="s6">
+    <h2><span class="chip gray">边界情况</span> 长得丑的地方，先定好</h2>
+    <table>
+      <tr><th>情况</th><th>会怎样</th><th>怎么处理</th></tr>
+      <tr>
+        <td><b>超长标题</b></td>
+        <td>材料条被撑爆，按钮被挤出去</td>
+        <td>材料条标题**单行省略号**（<code>text-overflow:ellipsis</code>），按钮固定不缩</td>
+      </tr>
+      <tr>
+        <td><b>超长正文</b></td>
+        <td>材料条展开后占满全屏，对话没了</td>
+        <td>展开区最高 <code>38dvh</code>，**内部滚动**</td>
+      </tr>
+      <tr class="hi">
+        <td><b>超长对话</b></td>
+        <td>翻到很早以前，输入框跟着滚走</td>
+        <td>输入框**钉在视口底部**，只有对话区滚</td>
+      </tr>
+      <tr>
+        <td><b>话题很多</b>（几十条）</td>
+        <td>面板列表拉不完</td>
+        <td>面板最高 <code>80dvh</code> **内部滚动**；主界面**永远只有一张材料**，与总量无关</td>
+      </tr>
+      <tr class="hi">
+        <td><b>用户一次发一大段</b></td>
+        <td>输入框要么被撑高毁布局，要么看不全</td>
+        <td>输入框**单行**，最多 3 行后内部滚动（同微信）</td>
+      </tr>
+      <tr>
+        <td><b>快速连点发送</b></td>
+        <td>同一句发两遍 / 请求打架</td>
+        <td>发送中**禁用输入与按钮**，请求返回才解锁</td>
+      </tr>
+      <tr class="hi">
+        <td><b>她"想"太久</b></td>
+        <td>「小问正在听…」一直转</td>
+        <td>超 <code>20s</code> → 转 4.2 发言失败（可重试）</td>
+      </tr>
+      <tr>
+        <td><b>她说的复述很长</b></td>
+        <td>气泡超过 80% 宽，糊成一片</td>
+        <td>气泡限宽 <code>80%</code>，自动换行</td>
+      </tr>
+      <tr>
+        <td><b>总结为空</b></td>
+        <td>面板里出现「」两个空引号</td>
+        <td>总结为空 → **不进"小问记住了"**，当作没懂</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ================= 7 Toast ================= -->
+  <section id="s7">
+    <h2><span class="chip">Toast</span> 刻意只有两条</h2>
+    <div class="lead">
+      这个产品的铁律是<b>不打扰</b>。所以不搞成功 Toast（"保存成功！"这种），
+      只有**真的失败了、且用户能自己救**的场景才提示。
+    </div>
+    <table>
+      <tr><th>场景</th><th>文案</th><th>形式 / 位置</th><th>时长</th></tr>
+      <tr>
+        <td>发言发不出去</td>
+        <td>没发出去 <span style="color:var(--coral)">· 重试</span></td>
+        <td>**对话流内**提示条（非浮层）</td>
+        <td>常驻到重试成功</td>
+      </tr>
+      <tr>
+        <td>服务连不上</td>
+        <td>没能拿到材料。检查下服务是不是没启动。</td>
+        <td>**整屏空态**（非浮层）</td>
+        <td>常驻到重试成功</td>
+      </tr>
+      <tr class="hi">
+        <td>记忆没写进盘</td>
+        <td colspan="3"><b>不提示</b>——静默降级。存储层的事不摊给用户</td>
+      </tr>
+      <tr class="hi">
+        <td>她"懂了"</td>
+        <td colspan="3"><b>不提示</b>——用她开口复述来表达，不用系统弹条</td>
+      </tr>
+    </table>
+    <div class="note">
+      <b>规则</b>：Toast 位置统一在**输入框上方**（拇指区，不遮内容）；错误类不自动消失；
+      同时最多 1 条（本产品不存在并发错误的场景）。
+    </div>
+  </section>
+
+  <!-- ================= 8 交互行为规则表 ================= -->
+  <section id="s8">
+    <h2><span class="chip">规则表</span> 前端照这张表实现</h2>
+    <table>
+      <tr><th>触发</th><th>用户操作</th><th>系统行为</th><th>反馈</th></tr>
+
+      <tr><td rowspan="2">用户</td><td>首次打开页面</td>
+        <td>GET <code>/api/topics</code> + GET 记忆（按设备 id）</td>
+        <td>整屏骨架 → 成功渲染；失败转 4.1</td></tr>
+      <tr><td>（加载超 20s）</td><td>中止请求</td><td>转 4.1 错误态</td></tr>
+
+      <tr class="hi"><td>用户</td><td>点材料条「收起 / 展开」</td>
+        <td>切换正文可见性</td><td>正文高度 0.3s 过渡；按钮文案在「收起 / 展开」间切</td></tr>
+
+      <tr><td rowspan="4">用户</td><td>点「换个材料」或小问头像</td>
+        <td>打开面板，渲染两区：还没讲的 / 小问记住了</td>
+        <td>面板从底部升起 0.26s</td></tr>
+      <tr><td>面板里点某张材料</td>
+        <td>设为当前材料 → **不产生任何消息**</td>
+        <td>面板收起；新材料展开正文、讲过的收起；输入框聚焦</td></tr>
+      <tr><td>点面板外 / ✕</td><td>关闭面板</td><td>面板下滑收起</td></tr>
+      <tr><td>面板里「还没讲的」为 0</td><td>不渲染该区</td><td>只剩「小问记住了」</td></tr>
+
+      <tr class="hi"><td rowspan="4">用户</td><td>输入文字</td>
+        <td>—</td><td>输入框获焦边框变珊瑚色；空内容时发送键不可点</td></tr>
+      <tr class="hi"><td>点发送 / 回车</td>
+        <td>① 用户消息上屏 ② <b>材料条自动收起</b> ③ 禁用输入与发送 ④ 显示「小问正在听…」 ⑤ POST <code>/api/chat</code></td>
+        <td>「小问正在听…」打在对话流末尾</td></tr>
+      <tr class="hi"><td>（请求成功）</td>
+        <td>移除加载中 → 追加她的回复 → 解锁输入 → 聚焦</td>
+        <td>她的话以气泡出现</td></tr>
+      <tr class="hi"><td>（请求失败/超时）</td>
+        <td>移除加载中 → 保留用户那条 → 追加可重试提示条</td>
+        <td>见 4.2</td></tr>
+
+      <tr><td rowspan="4">系统</td><td>（后端判定"她懂了"）</td>
+        <td>① 剥离隐藏标记 ② 生成一句口语化总结 ③ 写记忆 ④ 返回正文</td>
+        <td>她回复里出现复述确认（<b>用户感知不到标记与总结过程</b>）</td></tr>
+      <tr><td>（记忆写入成功）</td><td>刷新前端记忆状态</td>
+        <td>顶部「我记住 N 个了」+1；该材料移入面板「小问记住了」</td></tr>
+      <tr><td>（记忆写入失败）</td><td>丢弃这次的记忆更新，对话照常返回</td>
+        <td><b>静默</b>——用户察觉不到</td></tr>
+      <tr><td>（总结为空）</td><td>当作"还没懂"，不写记忆</td><td>静默</td></tr>
+
+      <tr class="hi"><td>异常</td><td>（网络断 / 服务停）</td>
+        <td>按 4.1 / 4.2 就地提示，不跳页、不弹窗</td>
+        <td>见错误态</td></tr>
+      <tr class="hi"><td>异常</td><td>（单篇正文坏了）</td>
+        <td>该材料降级展示</td><td>见 5 部分可用</td></tr>
+    </table>
+  </section>
+
+  <!-- ================= 9 状态 ← 数据映射 ================= -->
+  <section id="s9">
+    <h2><span class="chip gray">映射</span> 什么数据驱动什么状态</h2>
+    <table>
+      <tr><th>界面元素</th><th>由什么决定</th></tr>
+      <tr><td>小问常驻条那句话</td>
+        <td><code>记忆条数 N</code>：N=0 →「我还不懂这些，你挑一个讲给我听」；N&gt;0 →「我记住 N 个了，你挑一个接着讲」</td></tr>
+      <tr class="hi"><td>材料条标题</td><td><code>当前材料的 title</code>（单行省略）</td></tr>
+      <tr><td>材料条展开 / 收起</td>
+        <td>默认：未讲过的 = 展开，讲过的 = 收起；<b>用户一发送就强制收起</b>（本次会话内不再自动展开）</td></tr>
+      <tr class="hi"><td>面板「还没讲的」</td><td><code>记忆里没有的材料</code>，按原顺序</td></tr>
+      <tr><td>面板「小问记住了」</td><td><code>记忆里有 summary 的材料</code>，显示 title + summary</td></tr>
+      <tr class="hi"><td>空态 2.2</td><td><code>还没讲的 == 0 且 材料总数 &gt; 0</code></td></tr>
+      <tr><td>空态 2.1</td><td><code>材料总数 == 0</code></td></tr>
+      <tr class="hi"><td>材料条里的降级提示</td><td><code>当前材料的 content 为空</code></td></tr>
+      <tr><td>「当前」标签</td><td>面板项 id == 当前材料 id</td></tr>
+    </table>
+
+    <div class="note" style="margin-top:22px">
+      <b>记忆数据结构（V0.3 · 后端 memory.json）</b><br>
+      <code>{
+  "&lt;设备id&gt;": {
+    "&lt;材料id&gt;": { "summary": "给它一个目标，它自己拆步骤去干", "at": "2026-10-10" }
+  }
+}</code><br>
+      只存"讲过的 + 她记住的那句话"。**不存完整对话历史**——V0.3 用不着，留着以后再说。
+    </div>
+  </section>
+
+  <div class="note" style="border-left-color:var(--ink-2); margin-top:30px">
+    <b>这份文档和设计稿的关系</b>：<b>记忆-设计稿.html</b> 演的是"长什么样"（正常态 + 动效），
+    这份演的是"每种情况该怎么办"。前端实现时，两份对着看。
+  </div>
+
+</div>
+</body>
+</html>
